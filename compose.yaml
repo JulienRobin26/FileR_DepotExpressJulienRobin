@@ -1,0 +1,46 @@
+name: depotexpresse
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "127.0.0.1:3307:3306"   # visible seulement depuis le VPS (donc via tunnel SSH)
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"   # Nginx la sert sur /api/
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8081:80"     # visible seulement via tunnel SSH
+
+volumes:
+  db_data:
